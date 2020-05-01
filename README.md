@@ -2,13 +2,13 @@
 
 This is a NodeJS/Electron/TensorFlow applcation.
 
-<img src="./screenshots/Load.png">
-<img src="./screenshots/Train.png">
-<img src="./screenshots/Train2.png">
-<img src="./screenshots/Train3.png">
-<img src="./screenshots/Train4.png">
-<img src="./screenshots/Train5.png">
-<img src="./screenshots/Mix.png">
+![Screenshot](/screenshots/Load.png)
+![Screenshot](/screenshots/Train.png)
+![Screenshot](/screenshots/Train2.png)
+![Screenshot](/screenshots/Train3.png)
+![Screenshot](/screenshots/Train4.png)
+![Screenshot](/screenshots/Train5.png)
+![Screenshot](/screenshots/Mix.png)
 
 ## Building on Linux
 
