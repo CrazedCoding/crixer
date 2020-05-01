@@ -2,6 +2,14 @@
 
 This is a NodeJS/Electron/TensorFlow applcation.
 
+<img src="./screenshots/Load.png">
+<img src="./screenshots/Train.png">
+<img src="./screenshots/Train2.png">
+<img src="./screenshots/Train3.png">
+<img src="./screenshots/Train4.png">
+<img src="./screenshots/Train5.png">
+<img src="./screenshots/Mix.png">
+
 ## Building on Linux
 
 You must have NodeJS and npm's windows-build-tools installed to build this project.
