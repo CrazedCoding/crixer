@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Crixer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="./node_modules/codemirror/lib/codemirror.css">
+  <link rel="stylesheet" href="./node_modules/codemirror/addon/dialog/dialog.css">
+  <link rel="stylesheet" href="./node_modules/codemirror/theme/the-matrix.css">
+  <link rel="stylesheet" href="./css/style.css" />
+  <script> window.jQuery = window.$ = require('jquery'); </script>
+  <script src="./node_modules/dsp.js/dsp.js"></script>
+  <script src="./node_modules/bootstrap/dist/js/bootstrap.bundle.js"></script>
+  <script src="./node_modules/codemirror/lib/codemirror.js"></script>
+  <script src="./node_modules/codemirror/mode/javascript/javascript.js"></script>
+  <script src="./node_modules/codemirror/addon/display/autorefresh.js"></script>
+  <script src="./node_modules/codemirror/addon/display/placeholder.js"></script>
+  <script src="./node_modules/codemirror/addon/dialog/dialog.js"></script>
+  <script src="./node_modules/codemirror/addon/search/searchcursor.js"></script>
+  <script src="./node_modules/codemirror/addon/search/search.js"></script>
+  <script src="./node_modules/codemirror/addon/scroll/annotatescrollbar.js"></script>
+  <script src="./node_modules/codemirror/addon/search/matchesonscrollbar.js"></script>
+  <script src="./node_modules/codemirror/addon/search/jump-to-line.js"></script>
+
+</head>
+
+<body>
+
+  <!-- Nav tabs -->
+  <ul class="nav nav-tabs">
+    <li class="nav-item mx-auto">
+      <a class="nav-link active" data-toggle="tab" href="#load" onclick="state.renderLoadingTab()">Load</a>
+    </li>
+    <li class="nav-item mx-auto">
+      <a class="nav-link" data-toggle="tab" href="#training" onclick="state.renderTrainingTab()">Train</a>
+    </li>
+    <li class="nav-item mx-auto">
+      <a class="nav-link" data-toggle="tab" href="#label" onclick="state.renderMixingTab()">Mix</a>
+    </li>
+  </ul>
+
+  <!-- Modal -->
+  <div class="modal" data-backdrop="static"
+    style="color:#000; background-color:#000; z-index:99999; overflow-y: hidden;" id="processingModal" role="dialog"
+    aria-labelledby="processingModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document" style="height:100%; overflow-y: auto;">
+      <div class="modal-content" style="border:none !important; height:100%; overflow-y: auto;">
+        <div class="modal-body" style="text-align:center; border:none !important; height:100%;  overflow-y: auto;"
+          id="processing_div">
+          <h1 id="processing_header" style="z-index: 10; text-align:center; color:#0f0;" class="blink-white">Processing
+          </h1>
+          <!-- >div class="loader"></div-->
+
+          <label id="processing_message" style="color: #fff;"></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab panes -->
+  <div class="tab-content">
+    <!-- Modal -->
+    <div class="modal fade" data-backdrop="static" style="color:#000; background-color:#000;" id="labelEditorModal"
+      tabindex="-1" role="dialog" aria-labelledby="labelEditorModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="labelEditorModalLabel">Label Editor</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span style="color: #fff;" aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <br>
+            <form>
+              <div class="form-group">
+                <label for="label_name">Label Name:</label>
+                <input type="text" class="form-control" id="label_name" placeholder="Enter Label name...">
+                <br>
+                <div class="form-group">
+                  <label for="label_sound_select">Target Sound</label>
+                  <select class="form-control" id="label_sound_select">
+                  </select>
+                </div>
+                <br>
+                <div class="form-group">
+                  <label for="start_time">Start Time (seconds)</label>
+                  <input type="number" class="form-control" id="start_time" placeholder="0" min="0" max="99999999"
+                    step="0.01">
+                </div>
+                <div class="form-group">
+                  <label for="end_time">End Time (seconds)</label>
+                  <input type="number" class="form-control" id="end_time" placeholder="0" min="0" max="99999999"
+                    step="0.01">
+                </div>
+                <br>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-danger" style="text-align: left" data-dismiss="modal"
+              onclick="state.deleteLabel()">Delete</button>
+            <button type="button" class="btn btn-outline-warning" data-dismiss="modal">Close</button>
+            <button type="button" id="save_screen_selection" class="btn btn-outline-primary"
+              onclick="state.exitAndSaveLabelEditor()">Export Selected Labels</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-pane container active output" style="height: 100%;" id="load">
+      <br>
+      <div style="text-align: center;">
+        <label style="color: #fff;">INSTRUCTIONS (GENERAL):</label>
+      </div>
+      <div style="text-align: left;">
+
+        <label style="color: #fff;"><u>STEP #1</u>: Load the sounds you want to mix under the "Load" (this) tab.</label>
+        <br>
+        <label style="color: #fff;"><u>STEP #2</u>: Train your machine learning model from your sounds under the "Train"
+          tab.</label>
+        <br>
+        <label style="color: #fff;"><u>STEP #3</u>: Mix your sounds under the "Mix" tab.</label>
+      </div>
+      <div style="text-align: center;">
+        <br>
+        <button type="button" class="btn btn-outline-success mx-auto" onclick="$('#load_sound_file').click()">Load Sound
+          File(s)</button>
+        <br>
+        <input type="file" accept="audio/*" multiple style="color:#fff; display: none;" id="load_sound_file"
+          onchange="onTargetSoundSegmentSelected(event)">
+        <br>
+        <table class="table table-dark" id="load_sound_table" style="display:none">
+          <thead>
+            <tr>
+              <th>Sound Name</th>
+              <th>Duration</th>
+              <th>Delete</th>
+            </tr>
+          </thead>
+          <tbody id="load_sound_table_body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-pane container fade" id="training">
+      <br>
+      <div style="text-align: center;" id="training_warning">
+        <label class="blink">You must choose sounds to mix before you can train this program.</label>
+      </div>
+      <div id="training_content">
+        <div style="text-align: center;">
+          <label class="blink">Mixing program currrently not trained!<br>Press the "Train Now" button.</label>
+          <br>
+          <button type="button" class="btn btn-outline-success mx-auto d-block"
+            onclick="state.processFrequencies()">Train
+            Now</button>
+        </div>
+      </div>
+      <div id="training_complete" style="text-align: center;">
+        <label style="color:#0f0;" class="blink-white">Training Complete!</label>
+        <br>
+        <label style="color: #fff;">Click the "Mix" tab to proceed to the next step.</label>
+        <br>
+        <button type="button" class="btn btn-outline-success mx-auto d-block"
+          onclick="state.trainAgain()">Train
+          Again</button>
+      </div>
+    </div>
+    <div class="tab-pane container fade" id="label">
+      <br>
+      <div style="text-align: center;" id="mixing_warning">
+        <label class="blink">You must train your program before mix sounds.</label>
+      </div>
+      <div id="mixing_content">
+        <br>
+        <label style="color: #fff;"><u>STEP #1 (OPTIONAL)</u>: Configure the editable algorithm code below to fit your
+          mixing needs.</label>
+        <br>
+        <label style="color: #fff;"><u>STEP #2</u>: Press the "Mix Now" button.</label>
+        <br>
+        <button id="mix_now_button" class="btn btn-outline-success mx-auto d-block" onclick="state.mixNow()">
+          Mix Now
+        </button>
+        <br>
+        <div id="histograms_table_body">
+        </div>
+        <br>
+        <div style="text-align: center;">
+          <label style="color: #0f0;">Mixing Code:</label>
+        </div>
+        <textarea id="commandLineInputMix"></textarea>
+        <br>
+        <div style="text-align: center;">
+          <label style="color: #0f0;">Mixing Output:</label>
+        </div>
+        <textarea id="commandLineOutputMix">Commands and "console.log" output get printed here...</textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // AUDIO CONTEXT
+    window.AudioContext = (window.AudioContext ||
+      window.webkitAudioContext ||
+      window.mozAudioContext ||
+      window.oAudioContext ||
+      window.msAudioContext);
+
+    if (!AudioContext) alert('This site cannot be run in your Browser. Try a recent Chrome or Firefox. ');
+
+    var audioContext = new AudioContext();
+
+    var tensorflow = require('@tensorflow/tfjs-node-gpu');
+    //tensorflow.setBackend('webgl');
+
+    var outputTextAreaMix = document.getElementById("commandLineOutputMix");
+    var commandLineOutputMix = CodeMirror.fromTextArea(outputTextAreaMix, {
+      mode: "javascript",
+      lineNumbers: false,
+      theme: "the-matrix",
+      placeholder: "",
+      autoRefresh: true,
+      lineWrapping: false,
+      readOnly: true
+    });
+
+    var inputTextAreaMix = document.getElementById("commandLineInputMix");
+    var commandLineInputMix = CodeMirror.fromTextArea(inputTextAreaMix, {
+      mode: "javascript",
+      lineNumbers: false,
+      theme: "the-matrix",
+      autoRefresh: true,
+      lineWrapping: false,
+      placeholder: "Enter JavaScript command here...",
+      extraKeys: {
+        //"Enter": runTrainCommand
+      },
+      css: "height:2em; "
+    });
+    commandLineInputMix.setValue(`
+var sound = state.sounds[0];
+var mix_channel_count = sound.data.numberOfChannels;
+var mix_sample_rate = sound.data.sampleRate;
+var audio_context = new AudioContext();
+
+var all_audio = [];
+
+
+var max_ffts = state.temporal_perception;
+var num_iterations = sound.labels.length-max_ffts-1;
+var start = Math.floor(max_ffts);
+var current_fft = sound.labels[start]
+var previous_ffts = [];
+for(var i = 0; i < max_ffts; i++)
+  previous_ffts.push(sound.labels[start-max_ffts+i]);
+
+
+function iterate(iteration) {
+// sound.model.resetStates()
+    var new_fft_tensors = sound.model.predict(
+        tensorflow.tensor2d(previous_ffts).reshape([1, previous_ffts.length, previous_ffts[0].length]));
+    
+    current_fft = new_fft_tensors.arraySync()[0][0];
+    
+    var temp_audio_channel = audio_context.createBuffer(mix_channel_count, state.fft_size, mix_sample_rate);;;
+
+    var label = sound.labels[iteration+start];
+
+    for (var c = 0; c < mix_channel_count; c++) {
+
+        var ifft = new FFT(state.fft_size, mix_sample_rate);
+        var o = (c*state.fft_size*2)%current_fft.length;
+        var fft_a = [current_fft.slice((0+o), (state.fft_size+o)),
+                      current_fft.slice((state.fft_size+o), (state.fft_size*2+o))]
+
+        var signal = ifft.inverse(fft_a[0], fft_a[1]);;
+
+        var channel = temp_audio_channel.getChannelData(c);
+
+        for (var j = 0; j < channel.length; j++)
+            channel[j] = signal[j % signal.length];
+    }
+    previous_ffts.push(label);
+if(previous_ffts.length > max_ffts)
+      previous_ffts.shift();
+    all_audio.push(temp_audio_channel);
+}
+
+for (var i = 0; i < num_iterations; i++)
+{
+    iterate(i);
+    console.log(i);
+}
+
+
+var start_time = audio_context.currentTime;
+for (var i = 0; i < all_audio.length; i++) {
+    var temp_audio_channel = all_audio[i];
+    var source = audio_context.createBufferSource();
+    source.buffer = temp_audio_channel;
+    source.connect(audio_context.destination);
+    var play_time_offset = i * state.fft_size / mix_sample_rate;
+    var startTime = start_time + play_time_offset;
+    source.start(startTime);
+}
+`)
+
+    var maxBufferSize = 30;
+
+    var oldLog = console.log;
+    var logging = false;
+
+    function clipOutput() {
+      var outputString = commandLineOutput.getValue();
+      while (outputString.split("\n").length - 1 > maxBufferSize)
+        outputString = outputString.substring(0, outputString.lastIndexOf("\n") - 1);
+      commandLineOutput.setValue(outputString);
+    }
+
+    function TrainingSound(state = {}) {
+      this.name = state.name ? state.name : "";
+      this.data = state.data ? state.data : null;
+      this.channel_count = state.channel_count ? state.channel_count : 0;
+      this.model = state.model ? state.model : null;
+      this.raw_fft = state.raw_fft ? state.raw_fft : null;
+      this.multichannel_fft = state.multichannel_fft ? state.multichannel_fft : null;
+      this.grand_fft_avg = state.grand_fft_avg ? state.grand_fft_avg : 0;
+      this.temporal_samples = state.temporal_samples ? state.temporal_samples : null;
+      this.labels = state.labels ? state.labels : null;
+    }
+    TrainingSound.prototype.memberFunction = function () {
+    };
+    function SoundLabel(state = {}) {
+      this.name = state.name ? state.name : "";
+      this.target_sound = state.target_sound ? state.target_sound : "";
+      this.start = state.start ? state.start : 0;
+      this.stop = state.stop ? state.stop : 0;
+      this.active = state.active ? state.active : false;
+    }
+    SoundLabel.prototype.memberFunction = function () {
+    };
+
+    function GlobalState(state = {}) {
+      this.sounds = state.sounds ? state.ounds : [];
+      this.labels = state.labels ? state.labels : [];
+      this.model_trained = state.model_trained ? state.model_trained : false;
+      this.fft_size = state.fft_size ? state.fft_size : 1024;
+      this.samples_per_second_analyzed = state.samples_per_second_analyzed ? state.samples_per_second_analyzed : 8;
+      this.frequency_histogram_height_scalar = state.frequency_histogram_height_scalar ? state.frequency_histogram_height_scalar : 8;
+      this.temporal_perception = state.temporal_perception ? state.temporal_perception : 4;
+    }
+
+    GlobalState.prototype.mixNow = function () {
+      eval(commandLineInputMix.getValue());
+    }
+
+    GlobalState.prototype.renderLoadingTab = function () {
+      var html = '';
+      for (var i = 0; i < this.sounds.length; i++) {
+        html += '<tr data-toggle="modal"><td  class="pointer ' + (this.sounds[i].name == "" || this.sounds[i].data == "" || this.sounds[i].data == null ? 'blink' : '') + '">' + this.sounds[i].name + '</td>' +
+          '<td class="pointer ' + (!this.sounds[i].data || this.sounds[i].data.duration == 0 ? 'blink' : '') + '">' +
+          getStamp(this.sounds[i].data.duration)
+          + '</td><td  class="pointer"> <button type="button" onclick="state.deleteSound(' + i + ')" class="btn btn-outline-danger">Delete</button> </td></tr>';
+      }
+      $("#load_sound_table_body").empty();
+      $(html).appendTo("#load_sound_table_body");
+      if (this.sounds.length == 0)
+        $("#load_sound_table").hide();
+      else
+        $("#load_sound_table").show();
+    }
+
+    GlobalState.prototype.renderLoadingTab = function () {
+      var html = '';
+      for (var i = 0; i < this.sounds.length; i++) {
+        html += '<tr data-toggle="modal"><td  class="pointer ' + (this.sounds[i].name == "" || this.sounds[i].data == "" || this.sounds[i].data == null ? 'blink' : '') + '">' + this.sounds[i].name + '</td>' +
+          '<td class="pointer ' + (!this.sounds[i].data || this.sounds[i].data.duration == 0 ? 'blink' : '') + '">' +
+          getStamp(this.sounds[i].data.duration)
+          + '</td><td  class="pointer"> <button type="button" onclick="state.deleteSound(' + i + ')" class="btn btn-outline-danger">Delete</button> </td></tr>';
+      }
+      $("#load_sound_table_body").empty();
+      $(html).appendTo("#load_sound_table_body");
+      if (this.sounds.length == 0)
+        $("#load_sound_table").hide();
+      else
+        $("#load_sound_table").show();
+    }
+
+    GlobalState.prototype.renderTrainingTab = function () {
+      $("#training_content").hide();
+      $("#training_warning").hide();
+      $("#training_complete").hide();
+
+      if (this.sounds.length == 0) {
+        $("#training_warning").show();
+      }
+      else {
+        if (state.model_trained)
+          $("#training_complete").show();
+        else
+          $("#training_content").show();
+      }
+    }
+
+    GlobalState.prototype.renderMixingTab = function () {
+      ;
+      if (this.model_trained) {
+        $("#mixing_content").show();
+        $("#mixing_warning").hide();
+      }
+      else {
+        $("#mixing_content").hide();
+        $("#mixing_warning").show();
+      }
+    }
+
+    GlobalState.prototype.deleteSound = function (index) {
+      this.sounds.splice(index, 1);
+      this.renderLoadingTab();
+    }
+    GlobalState.prototype.deleteAllSounds = function () {
+      this.sounds.splice(0, state.sounds.length);
+      this.renderLoadingTab();
+    }
+
+    var state = new GlobalState();
+
+    GlobalState.prototype.showProcessing = function (message = "Processing") {
+      $("#processingModal").modal("show");
+      $("#processing_header").html(message);
+      this.showProgressPercent(0);
+    }
+
+    GlobalState.prototype.hideProcessing = function () {
+      $("#processingModal").modal("hide");
+    }
+
+    GlobalState.prototype.showProgressPercent = function (percent) {
+      $("#processing_message").html(Math.floor(percent) + "%");
+    }
+    GlobalState.prototype.showProgressMessage = function (message) {
+      $("#processing_message").html(message);
+    }
+
+    GlobalState.prototype.trainAgain = function (sound_index = 0) {
+      state.showProcessing("Training Neural Network<br>(" + (sound_index + 1) + " of " + state.sounds.length + ")");
+      state.showProgressMessage("");
+
+      var sound = state.sounds[sound_index];
+
+      var xs = tensorflow.tensor3d(sound.temporal_samples);
+      var ys = tensorflow.tensor2d(sound.labels).reshape([sound.labels.length,1, sound.labels[0].length]);
+
+      var epoch_count = 40;
+
+      sound.model.fit(xs, ys, {
+        shuffle: false,
+        epochs: epoch_count,
+        batchSize: Math.min(sound.labels.length, 1024),
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+            state.showProgressPercent(epoch * 100.0 / (epoch_count));
+            console.log(logs.loss.toFixed(5));
+          },
+          onBatchEnd: async (batch, logs) => {
+            await tensorflow.nextFrame();
+          },
+          onTrainEnd: () => {
+            sound_index++
+            if (sound_index < state.sounds.length) {
+              state.trainAgain(sound_index);
+            }
+            else {
+              state.model_trained = true;
+              state.renderTrainingTab();
+              state.renderHistograms();
+              state.hideProcessing();
+            }
+          },
+        },
+      });
+    }
+
+    GlobalState.prototype.train = function (sound_index = 0) {
+      state.showProcessing("Training Neural Network<br>(" + (sound_index + 1) + " of " + state.sounds.length + ")");
+      state.showProgressMessage("");
+
+      var sound = state.sounds[sound_index];
+
+      var xs = tensorflow.tensor3d(sound.temporal_samples);
+      var ys = tensorflow.tensor2d(sound.labels).reshape([sound.labels.length,1, sound.labels[0].length]);
+
+      sound.model = tensorflow.sequential();
+
+      var rnn_output_neurons = 128;
+
+      const input = tensorflow.layers.lstm({
+        units: rnn_output_neurons,
+        inputShape: [sound.temporal_samples[0].length, sound.temporal_samples[0][0].length],
+        returnSequences:false,
+        activation: 'linear'
+      })
+
+      const output = tensorflow.layers.dense({
+        units: sound.labels[0].length,
+        activation: 'relu'
+      });
+
+      sound.model.add(input);
+      //sound.model.add(tensorflow.layers.permute({dims: [2, 1]}));
+      //sound.model.add(tensorflow.layers.flatten());
+      sound.model.add(tensorflow.layers.reshape({targetShape: [1, rnn_output_neurons]}))
+      sound.model.add(output);
+
+      const learning_rate = .00125;
+      const optimizer = tensorflow.train.rmsprop(learning_rate);//sgd(learning_rate);
+
+      sound.model.compile({
+        optimizer: optimizer,
+        loss: tensorflow.metrics.meanSquaredError,
+        metrics: ['accuracy'],
+      });
+
+      var epoch_count = 100;
+
+      sound.model.fit(xs, ys, {
+        shuffle: false,
+        //validationSplit: .5,
+        batchSize: Math.min(sound.labels.length, 1024),
+        epochs: epoch_count,
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+            state.showProgressPercent(epoch * 100.0 / (epoch_count));
+            console.log(logs.loss.toFixed(5));
+          },
+          onBatchEnd: async (batch, logs) => {
+            await tensorflow.nextFrame();
+          },
+          onTrainEnd: () => {
+            sound_index++
+            if (sound_index < state.sounds.length) {
+              state.train(sound_index);
+            }
+            else {
+              state.model_trained = true;
+              state.renderTrainingTab();
+              state.renderHistograms();
+              state.hideProcessing();
+            }
+          },
+        },
+      });
+    }
+
+    GlobalState.prototype.renderHistograms = function () {
+
+      state.showProcessing("Rendering Histograms");
+      state.showProgressMessage("");
+
+      var html = $("#histograms_table_body");
+      html.empty();
+      for (var i = 0; i < this.sounds.length; i++) {
+        var sound = this.sounds[i];
+
+        var map = [];
+
+        var map = new Array(sound.multichannel_fft.length).fill(null).map((e) => {
+          return new Array(sound.multichannel_fft[0].length).fill(0);
+        });
+
+        var avg_avg = 0;
+        map.forEach((slice, i) => {
+          slice.forEach((freq_domain, j) => {
+            map[i][j] = sound.multichannel_fft[i][j];
+            avg_avg += sound.multichannel_fft[i][j];
+          });
+        });
+
+        avg_avg /= map[0].length * map.length;
+
+        map = map.map((slice, i) => {
+          return slice.map((val) => {
+            return Math.min(val / avg_avg, 1.);
+          });
+        });
+
+        var transpose = new Array(map[0].length).fill(null).map((val, i) => {
+          return new Array(map.length).fill(0).map((arr, j) => {
+            return map[j][i];
+          })
+        });
+
+        var canvas = document.createElement("canvas");
+        canvas.width = map.length;
+        canvas.height = map[0].length;
+
+        $(canvas).css("width", map.length*2+"px").css("height", 128+"px").appendTo(html);
+
+        tensorflow.browser.toPixels(tensorflow.tensor2d(transpose), canvas);
+      }
+      state.hideProcessing();
+    }
+
+    GlobalState.prototype.processFrequencies = function () {
+      state.showProcessing("Processing Frequencies");
+      state.showProgressMessage("");
+
+      var progress = [];
+
+      function processSound(sound_index) {
+        var sound = state.sounds[sound_index];
+        var buffer = sound.data;;
+        sound.raw_fft = [];
+
+        function processChannelData(channel_data, channel_position, sound_index, signal_position = 0) {
+          var signal = channel_data.slice(signal_position, signal_position + state.fft_size);
+          signal = Array.from(signal);
+          for (var k = signal.length; k < state.fft_size; k++)
+            signal.push(0);
+
+          //var fft = tensorflow.complex(signal, tensorflow.zeros([signal.length])).fft();
+          //var complex = tensorflow.tensor(fft.dataSync(), [state.fft_size, 2]);
+          //complex = complex.arraySync();
+          var fft = new FFT(signal.length, state.sounds[sound_index].data.sampleRate);
+          fft.forward(signal);
+          var raw_fft = [fft.real, fft.imag];
+
+
+          state.sounds[sound_index].raw_fft[channel_position].push(raw_fft);
+
+          progress[sound_index].percent = signal_position * 100.0 / (channel_data.length + state.fft_size);
+
+          if (signal_position < channel_data.length + state.fft_size) {
+            signal_position += state.fft_size;
+            window.setTimeout(processChannelData, 0, channel_data, channel_position, sound_index, signal_position);
+          }
+          else {
+            progress[sound_index].done = true;
+          }
+        }
+        for (var channel_index = 0; channel_index < buffer.numberOfChannels; channel_index++) {
+          var channel_data = buffer.getChannelData(channel_index);
+          sound.raw_fft.push([]);
+          processChannelData(channel_data, channel_index, sound_index);
+        }
+      }
+      for (var sound_index = 0; sound_index < this.sounds.length; sound_index++) {
+        progress.push({ percent: 0, done: false });
+        processSound(sound_index)
+      }
+      function updateUI() {
+        var finished = true;
+        var max_length = 24;
+        var message = "";
+        var total_duration = 0;
+        var total_complete = 0;
+        for (var sound_index = 0; sound_index < state.sounds.length; sound_index++) {
+          finished = finished && progress[sound_index].done;
+          var percent = progress[sound_index].percent;
+
+          total_complete += percent / 100. * state.sounds[sound_index].data.duration;
+          total_duration += state.sounds[sound_index].data.duration;
+        }
+
+        var ratio_complete = total_complete / total_duration;
+
+        var r = (1. - ratio_complete);
+        var g = (ratio_complete);
+        var b = 0;
+
+        var l = Math.max(r, Math.max(g, b));
+
+        r /= l;
+        g /= l;
+        b /= l;
+
+        r = Math.floor(r * 255);
+        g = Math.floor(g * 255);
+        b = Math.floor(b * 255);
+
+        message += '<font style="color: rgb(' + r + ', ' + g + ', ' + b + ')">';
+        message += Math.floor(ratio_complete * 100) + "% Complete";
+        message += '</font><br><br>';
+
+        for (var sound_index = 0; sound_index < state.sounds.length; sound_index++) {
+          var done = progress[sound_index].done;
+          finished = finished && done;
+          var percent = progress[sound_index].percent;
+          var name = state.sounds[sound_index].name;
+          if (name.length > max_length)
+            name = name.substring(0, max_length) + "...";
+          var max_bars = max_length + 9;
+          var bars = "";
+          for (var i = 0; i < max_bars; i++) {
+
+            if (i * 100.0 / max_bars <= percent) {
+              r = (1. - i * 1.0 / max_bars);
+              g = (i * 1.0 / max_bars);
+              b = 0;
+
+              var l = Math.max(r, Math.max(g, b));
+
+              r /= l;
+              g /= l;
+              b /= l;
+
+              r = Math.floor(r * 255);
+              g = Math.floor(g * 255);
+              b = Math.floor(b * 255);
+
+              if (done) {
+                r = 32;
+                g = 32;
+                b = 255;
+              }
+
+              bars += '<font style="color: rgb(' + r + ', ' + g + ', ' + b + ')">';
+              bars += "|";
+              bars += '</font>';
+            }
+            else
+              bars += "-";
+          }
+          message += name + " - " + Math.floor(percent) + "%<br>" + bars + "<br><br>";
+        }
+        state.showProgressMessage(message);
+
+        if (!finished)
+          window.setTimeout(updateUI, 100);
+        else {
+
+          function loadTemporalSamples(sound_index) {
+            var sound = state.sounds[sound_index];
+            sound.temporal_samples = [];
+            sound.labels = [];
+
+            var empty_sample = new Array(state.fft_size*2.).fill(0);
+
+            for (var sample_index = 0; sample_index < sound.raw_fft[0].length; sample_index++) {
+              sound.temporal_samples.push([])
+              for(var p = -state.temporal_perception; p < 0; p++)
+              {
+                var temporal_sample = [];
+                for (var channel_index = 0; channel_index < sound.raw_fft.length; channel_index++) {
+                  var idx = sample_index + p;
+
+                  if(sound.raw_fft[channel_index][idx])
+                  {
+                    var r = sound.raw_fft[channel_index][idx][0];
+                    var i = sound.raw_fft[channel_index][idx][1];
+                    var combined = new Float64Array(r.length+i.length)
+                    combined.set(r);
+                    combined.set(i, r.length);
+                    temporal_sample = temporal_sample.concat([].slice.call(combined));
+                  }
+                  else
+                    temporal_sample = temporal_sample.concat(empty_sample);
+                }
+                sound.temporal_samples[sample_index].push(temporal_sample);
+              }
+              var temporal_label = [];
+              for (var channel_index = 0; channel_index < sound.raw_fft.length; channel_index++) {
+                  var r = sound.raw_fft[channel_index][sample_index][0];
+                  var i = sound.raw_fft[channel_index][sample_index][1];
+                  var combined = new Float64Array(r.length+i.length)
+                  combined.set(r);
+                  combined.set(i, r.length);
+                  temporal_label = temporal_label.concat([].slice.call(combined));
+              }
+              sound.labels.push(temporal_label);
+            }
+
+            sound_index++;
+            if (sound_index < state.sounds.length) {
+              state.showProgressPercent(sound_index * 100.0 / state.sounds.length);
+              window.setTimeout(loadTemporalSamples, 0, sound_index);
+            }
+            else {
+              state.train();
+            }
+          }
+
+          state.showProcessing("Averaging Channel Data");
+          state.showProgressPercent(0);
+
+          function processMultichannelData(sound_index) {
+            var sound = state.sounds[sound_index];
+
+            var raw_fft_mag = new Array(sound.raw_fft[0].length).fill(null).map((w, j) => {
+              return new Array(state.fft_size).fill(0);
+            });
+
+            sound.raw_fft.forEach((channel, c) => {
+              channel.forEach((slice, i) => {
+                slice[0].forEach((freq_domain, j) => {
+                  raw_fft_mag[i][j] += Math.sqrt(slice[0][j] * slice[0][j] + slice[1][j] * slice[1][j]) / sound.data.numberOfChannels;
+                });
+              });
+            });
+
+            var histogram_scalar = { x: Math.floor(sound.data.sampleRate / state.fft_size / state.samples_per_second_analyzed + .5), y: state.frequency_histogram_height_scalar };
+
+            var histogram_width = Math.floor(raw_fft_mag.length / histogram_scalar.x + .5);
+            var histogram_height = state.fft_size / histogram_scalar.y;
+
+            //Convolve Y
+            raw_fft_mag = raw_fft_mag.map((slice, i) => {
+              return new Array(histogram_height).fill(0).map((freq, j) => {
+                var avg = 0;
+                for (var k = j * histogram_scalar.y; k < (j + 1) * histogram_scalar.y; k++)
+                  avg += raw_fft_mag[i][k];
+                avg /= histogram_scalar.y;
+                return avg;
+              });
+            });
+
+            //Convolve X
+            raw_fft_mag = new Array(histogram_width).fill(null).map((slice, i) => {
+              return new Array(histogram_height).fill(0).map((freq, j) => {
+                var avg = 0;
+                for (var k = i * histogram_scalar.x; k < (i + 1) * histogram_scalar.x; k++)
+                  avg += raw_fft_mag[Math.min(k, raw_fft_mag.length - 1)][j];
+                avg /= histogram_scalar.x;
+                return avg;
+              });
+            });
+
+
+            //Get grand average
+            var average = 0;
+            raw_fft_mag.forEach((slice) => {
+              slice.forEach((freq) => {
+                average += freq;
+              });
+            });
+            average /= histogram_width * histogram_height;
+
+            raw_fft_mag = raw_fft_mag.map((e)=>{
+              return e.slice(e.length/2, e.length);
+            });
+
+            sound.grand_fft_avg = average;
+            sound.multichannel_fft = raw_fft_mag;
+
+
+            sound_index++;
+            if (sound_index < state.sounds.length) {
+              state.showProgressPercent(sound_index * 100.0 / state.sounds.length);
+              window.setTimeout(processMultichannelData, 0, sound_index);
+            }
+            else {
+              state.showProcessing("Making Temporal Samples");
+              state.showProgressPercent(0);
+              window.setTimeout(loadTemporalSamples, 0, 0);
+            }
+          }
+          window.setTimeout(processMultichannelData, 0, 0);
+        }
+      }
+
+      window.setTimeout(updateUI, 100);
+    }
+
+    function onDecodeError() { alert('Error while decoding your file (s).'); }
+
+    function onTargetSoundSegmentSelected(e) {
+      state.model_trained = false;
+      state.deleteAllSounds();
+      var loadedSounds = 0;
+      if (e.target.files.length > 0)
+        state.showProcessing("Reading Files");
+
+      for (var i = 0; i < e.target.files.length; i++) {
+        var file = e.target.files[i];
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+          audioContext.decodeAudioData(e.target.result,
+            function (buffer) {
+              var newTrainingSound = new TrainingSound();
+              newTrainingSound.name = this.file.name;
+              newTrainingSound.channel_count = buffer.numberOfChannels;
+              newTrainingSound.data = buffer;
+              state.sounds.push(newTrainingSound);
+              state.renderLoadingTab();
+              loadedSounds++;
+              if (loadedSounds == this.file_count) {
+                state.hideProcessing();
+              }
+              else
+                state.showProgressPercent(loadedSounds * 100.0 / this.file_count)
+
+            }.bind(this), onDecodeError);
+        }.bind({ file: file, file_count: e.target.files.length })
+        reader.readAsArrayBuffer(file);
+        try {
+        }
+        catch (e) {
+          console.log(e)
+        }
+      }
+    }
+    function getStamp(duration) {
+      return Math.floor(duration / 60) + ":" + (duration % 60 < 10 ? "0" : "") + Math.floor(duration) % 60;
+    }
+
+    function ab2str(buf) {
+      return String.fromCharCode.apply(null, new Uint16Array(buf));
+    }
+    function str2ab(str) {
+      var buf = new ArrayBuffer(str.length * 2); // 2 bytes for each char
+      var bufView = new Uint16Array(buf);
+      for (var i = 0, strLen = str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+      }
+      return buf;
+    }
+
+    var oldLog = console.log;
+    var maxOutputHeight = 30;
+    function clipOutput() {
+      var outputString = commandLineOutputMix.getValue();
+      while (outputString.split("\n").length - 1 > maxOutputHeight)
+        outputString = outputString.substring(0, outputString.lastIndexOf("\n") - 1);
+      commandLineOutputMix.setValue(outputString);
+    }
+    console.log = function (message) {
+      oldLog(message);
+      var oldOutput = commandLineOutputMix.getValue();
+      commandLineOutputMix.setValue(oldOutput == "" ? "" + message : message + "\n" + oldOutput);
+      clipOutput();
+    }
+  </script>
+</body>
+
+</html>
